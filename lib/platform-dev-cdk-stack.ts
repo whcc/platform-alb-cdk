@@ -16,7 +16,7 @@ export class PlatformDevCdkStack extends Stack {
     // by default, which creates an internal load balancer.
     const lb = new alb.ApplicationLoadBalancer(this, 'LB', {
       vpc,
-      internetFacing: true
+      internetFacing: false
     });
 
     // HTTP:80 Listener
