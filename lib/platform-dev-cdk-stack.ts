@@ -23,14 +23,14 @@ export class PlatformDevCdkStack extends Stack {
     const lbListener = lb.addListener('HTTPListener', { port: 80, open: true });
 
     lbListener.addAction('loginAction', {
-      action: alb.ListenerAction.redirect({ protocol: 'HTTPS', port: '443', host: '#{host}', path: '/#{path}', query: '#{query}', permanent: true }),
+      action: lb.ListenerAction.redirect({ protocol: 'HTTPS', port: '443', host: '#{host}', path: '/#{path}', query: '#{query}', permanent: true }),
     });
 
     // OAuth
-    const whccloginTargetGroup = new alb.ApplicationTargetGroup(this, 'DevWhccloginTargetGroup', {
+    const whccloginTargetGroup = new lb.ApplicationTargetGroup(this, 'DevWhccloginTargetGroup', {
       port: 80,
-      protocol: alb.ApplicationProtocol.HTTP,
-      targetType: alb.TargetType.IP,
+      protocol: lb.ApplicationProtocol.HTTP,
+      targetType: lb.TargetType.IP,
       targetGroupName: 'dev2-login-whcc-com',
       targets: [
         new targets.IpTarget('10.32.26.180') // Since this IP address is within the VPC, use default (us-east-2)
@@ -44,11 +44,11 @@ export class PlatformDevCdkStack extends Stack {
     });
 
     // OAS
-    const oasTargetGroup = new alb.ApplicationTargetGroup(this, 'oasApiTargetGroup', {
+    const oasTargetGroup = new lb.ApplicationTargetGroup(this, 'oasApiTargetGroup', {
       port: 80,
-      protocol: alb.ApplicationProtocol.HTTP,
+      protocol: lb.ApplicationProtocol.HTTP,
       targetGroupName: 'dev2-oas-api',
-      targetType: alb.TargetType.IP,
+      targetType: lb.TargetType.IP,
       targets: [
         new targets.IpTarget('10.32.26.180')
       ],
@@ -57,15 +57,15 @@ export class PlatformDevCdkStack extends Stack {
         healthyHttpCodes: '200-204',
         port: '3002'
       },
-      vpc,
+      vpc
     });
 
 
     // GPIntegration
-    const gpTargetGroup = new alb.ApplicationTargetGroup(this, 'DevGpIntegrationTargetGroup', {
+    const gpTargetGroup = new lb.ApplicationTargetGroup(this, 'DevGpIntegrationTargetGroup', {
       port: 80,
-      protocol: alb.ApplicationProtocol.HTTP,
-      targetType: alb.TargetType.IP,
+      protocol: lb.ApplicationProtocol.HTTP,
+      targetType: lb.TargetType.IP,
       targetGroupName: 'dev2-gpintegration',
       targets: [
         new targets.IpTarget('10.32.26.180')
