@@ -11,69 +11,72 @@ export class PlatformDevCdkStack extends Stack {
     // Get our existing VPC
     let vpc: ec2.IVpc;
     vpc = ec2.Vpc.fromLookup(this, 'vpc', { vpcId: awsConfig.vpcArn });
-    
+
     // Create the load balancer in a VPC. 'internetFacing' is 'false'
     // by default, which creates an internal load balancer.
     const lb = new alb.ApplicationLoadBalancer(this, 'LB', {
       vpc,
-      internetFacing: false
+      internetFacing: true
     });
 
     // HTTP:80 Listener
     const lbListener = lb.addListener('HTTPListener', { port: 80, open: true });
 
+    lbListener.addAction('loginAction', {
+      action: alb.ListenerAction.redirect({ protocol: 'HTTPS', port: '443', host: '#{host}', path: '#{path}', query: '#{query}' }),
+    });
+
     // OAuth
-    const whcclogin = new alb.ApplicationTargetGroup(this, 'DevWhccloginTargetGroup', {
+    const whccloginTargetGroup = new alb.ApplicationTargetGroup(this, 'DevWhccloginTargetGroup', {
       port: 80,
       protocol: alb.ApplicationProtocol.HTTP,
       targetType: alb.TargetType.IP,
-      targetGroupName: 'login-whcc-com',
+      targetGroupName: 'dev2-login-whcc-com',
       targets: [
-        new targets.IpTarget('10.32.26.180')
+        new targets.IpTarget('10.32.26.180') // Since this IP address is within the VPC, use default (us-east-2)
       ],
       healthCheck: {
-        path: '/api/health',
-        healthyHttpCodes: '200-204'
+        path: '/health',
+        healthyHttpCodes: '200-204',
+        port: '3063'
       },
       vpc
     });
 
     // OAS
-    const oasApi = new alb.ApplicationTargetGroup(this, 'oasApiTargetGroup', {
+    const oasTargetGroup = new alb.ApplicationTargetGroup(this, 'oasApiTargetGroup', {
       port: 80,
       protocol: alb.ApplicationProtocol.HTTP,
-      targetGroupName: 'oas-api',
+      targetGroupName: 'dev2-oas-api',
       targetType: alb.TargetType.IP,
       targets: [
         new targets.IpTarget('10.32.26.180')
       ],
       healthCheck: {
         path: '/api/health',
-        healthyHttpCodes: '200-204'
+        healthyHttpCodes: '200-204',
+        port: '3002'
       },
-      vpc
+      vpc,
     });
+
 
     // GPIntegration
     const gpTargetGroup = new alb.ApplicationTargetGroup(this, 'DevGpIntegrationTargetGroup', {
       port: 80,
       protocol: alb.ApplicationProtocol.HTTP,
       targetType: alb.TargetType.IP,
-      targetGroupName: 'gpintegration',
+      targetGroupName: 'dev2-gpintegration',
       targets: [
         new targets.IpTarget('10.32.26.180')
       ],
       healthCheck: {
-        path: '/api/health',
-        healthyHttpCodes: '200-204'
+        path: '/gp/health',
+        healthyHttpCodes: '200-204',
+        port: '3039'
       },
       vpc
     });
 
-    lbListener.addTargetGroups('AddTargetGroup', {
-      targetGroups: [ gpTargetGroup ]
-    });
   }
 }
-
-
