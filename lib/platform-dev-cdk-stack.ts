@@ -23,7 +23,7 @@ export class PlatformDevCdkStack extends Stack {
     const lbListener = lb.addListener('HTTPListener', { port: 80, open: true });
 
     lbListener.addAction('loginAction', {
-      action: alb.ListenerAction.redirect({ protocol: 'HTTPS', port: '443', host: '#{host}', path: '#{path}', query: '#{query}' }),
+      action: alb.ListenerAction.redirect({ protocol: 'HTTPS', port: '443', host: '#{host}', path: '/#{path}', query: '#{query}' }),
     });
 
     // OAuth
