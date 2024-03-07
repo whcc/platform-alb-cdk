@@ -1,6 +1,7 @@
 import { Duration, Stack, StackProps } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as alb from 'aws-cdk-lib/aws-elasticloadbalancingv2';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import { Construct } from 'constructs';
 import { AwsConfig } from './types';
 import * as targets from 'aws-cdk-lib/aws-elasticloadbalancingv2-targets';
@@ -78,6 +79,33 @@ export class PlatformDevCdkStack extends Stack {
         port: '3039'
       },
       vpc
+    });
+
+    // Get wildcard certificate
+    const certificateArn = 'arn:aws:acm:us-east-2:799497006720:certificate/ce6306c4-27ee-4d93-b12a-fafab73552af'; // TODO
+    const sslCertificate = acm.Certificate.fromCertificateArn(this, 'SSLCertificate', certificateArn);
+  
+    // HTTPS:443 Listener
+    const httpsListener = lb.addListener('HTTPSListener', { port: 443, open: true, certificates: [sslCertificate] });
+
+    // Add GPInt rule
+    httpsListener.addAction('httpsGpIntAction', {
+      priority: 1,
+      conditions: [
+        alb.ListenerCondition.pathPatterns(['/']),
+        alb.ListenerCondition.hostHeaders(['dev-gpintegration.whcc.com']),
+      ],
+      action: alb.ListenerAction.forward([gpTargetGroup]),
+    });
+
+    // TODO: Add the rest of the rules from the platform-prod alb-internal-apps HTTPS:443 listener
+
+    // Default rule: return 503
+    httpsListener.addAction('defaultHttpsAction', {
+      action: alb.ListenerAction.fixedResponse(503, {
+        contentType: 'text/plain',
+        messageBody: 'Service Unavailable',
+      }),
     });
 
   }
