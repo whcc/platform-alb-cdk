@@ -20,9 +20,11 @@ export class PlatformDevCdkStack extends Stack {
     });
 
     // HTTP:80 Listener
-    const lbListener = lb.addListener('HTTPListener', { port: 80, open: true });
+    const httpListener = lb.addListener('HTTPListener', { port: 80, open: true });
 
-    lbListener.addAction('loginAction', {
+    // TODO: Need to add additional rules???
+
+    httpListener.addAction('defaultHttpAction', {
       action: alb.ListenerAction.redirect({ protocol: 'HTTPS', port: '443', host: '#{host}', path: '/#{path}', query: '#{query}', permanent: true }),
     });
 
