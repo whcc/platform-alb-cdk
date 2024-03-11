@@ -1,4 +1,4 @@
-import { Duration, Stack, StackProps } from 'aws-cdk-lib';
+import { Stack } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as alb from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
@@ -63,7 +63,6 @@ export class PlatformDevCdkStack extends Stack {
       vpc
     });
 
-
     // GPIntegration
     const gpTargetGroup = new alb.ApplicationTargetGroup(this, 'DevGpIntegrationTargetGroup', {
       port: 80,
@@ -98,7 +97,53 @@ export class PlatformDevCdkStack extends Stack {
       action: alb.ListenerAction.forward([gpTargetGroup]),
     });
 
-    // TODO: Add the rest of the rules from the platform-prod alb-internal-apps HTTPS:443 listener
+    // Add GPInt rule
+    httpsListener.addAction('httpsGpIntActionAllPaths', {
+      priority: 2,
+      conditions: [
+        alb.ListenerCondition.pathPatterns(['/*']),
+        alb.ListenerCondition.hostHeaders(['dev-gpintegration.whcc.com']),
+      ],
+      action: alb.ListenerAction.forward([gpTargetGroup]),
+    });
+        
+    // Add OAS rule
+    httpsListener.addAction('httpsOasAction', {
+      priority: 3,
+      conditions: [
+        alb.ListenerCondition.pathPatterns(['/']),
+        alb.ListenerCondition.hostHeaders(['dev-apps.whcc.com']),
+      ],
+      action: alb.ListenerAction.forward([oasTargetGroup]),
+    });
+
+    httpsListener.addAction('httpsOasActionAllAllPaths', {
+      priority: 4,
+      conditions: [
+        alb.ListenerCondition.pathPatterns(['/*']),
+        alb.ListenerCondition.hostHeaders(['dev-apps.whcc.com']),
+      ],
+      action: alb.ListenerAction.forward([oasTargetGroup]),
+    });
+
+    // Add OAuth rule
+    httpsListener.addAction('httpsOAuthAction', {
+      priority: 5,
+      conditions: [
+        alb.ListenerCondition.pathPatterns(['/']),
+        alb.ListenerCondition.hostHeaders(['dev-login.whcc.com']),
+      ],
+      action: alb.ListenerAction.forward([whccloginTargetGroup]),
+    });
+
+    httpsListener.addAction('httpsOAuthActionAllPaths', {
+      priority: 6,
+      conditions: [
+        alb.ListenerCondition.pathPatterns(['/*']),
+        alb.ListenerCondition.hostHeaders(['dev-login.whcc.com']),
+      ],
+      action: alb.ListenerAction.forward([whccloginTargetGroup]),
+    });
 
     // Default rule: return 503
     httpsListener.addAction('defaultHttpsAction', {
@@ -107,6 +152,5 @@ export class PlatformDevCdkStack extends Stack {
         messageBody: 'Service Unavailable',
       }),
     });
-
   }
 }
