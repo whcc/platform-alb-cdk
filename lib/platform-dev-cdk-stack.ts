@@ -1,4 +1,4 @@
-import { Stack } from 'aws-cdk-lib';
+import { Duration, Stack } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as alb from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
@@ -13,21 +13,14 @@ export class PlatformDevCdkStack extends Stack {
     let vpc: ec2.IVpc;
     vpc = ec2.Vpc.fromLookup(this, 'vpc', { vpcId: awsConfig.vpcArn });
 
-    // Create the load balancer in a VPC. 'internetFacing' is 'false'
-    // by default, which creates an internal load balancer.
+    // Create the load balancer in a VPC. Value for 'internetFacing' is 'false', this will create an internal load balancer.
     const lb = new alb.ApplicationLoadBalancer(this, 'LB', {
       vpc,
       internetFacing: false
     });
 
-    // HTTP:80 Listener
-    const httpListener = lb.addListener('HTTPListener', { port: 80, open: true });
-
-    // TODO: Need to add additional rules???
-
-    httpListener.addAction('defaultHttpAction', {
-      action: alb.ListenerAction.redirect({ protocol: 'HTTPS', port: '443', host: '#{host}', path: '/#{path}', query: '#{query}', permanent: true }),
-    });
+    const devInternalSecurityGroup = new ec2.SecurityGroup(this, 'devInternalSecurityGroup', { vpc, allowAllOutbound: true });
+    lb.addSecurityGroup(devInternalSecurityGroup);
 
     // OAuth
     const whccloginTargetGroup = new alb.ApplicationTargetGroup(this, 'DevWhccloginTargetGroup', {
@@ -36,14 +29,15 @@ export class PlatformDevCdkStack extends Stack {
       targetType: alb.TargetType.IP,
       targetGroupName: 'dev2-login-whcc-com',
       targets: [
-        new targets.IpTarget('10.32.26.180') // Since this IP address is within the VPC, use default (us-east-2)
+        new targets.IpTarget('10.32.26.180')
       ],
       healthCheck: {
         path: '/health',
         healthyHttpCodes: '200-204',
-        port: '3063'
+        port: '3063',
+        interval: Duration.seconds(10)
       },
-      vpc
+      vpc,
     });
 
     // OAS
@@ -58,7 +52,8 @@ export class PlatformDevCdkStack extends Stack {
       healthCheck: {
         path: '/api/health',
         healthyHttpCodes: '200-204',
-        port: '3002'
+        port: '3002',
+        interval: Duration.seconds(10)
       },
       vpc
     });
@@ -75,9 +70,27 @@ export class PlatformDevCdkStack extends Stack {
       healthCheck: {
         path: '/gp/health',
         healthyHttpCodes: '200-204',
-        port: '3039'
+        port: '3039',
+        interval: Duration.seconds(10)
       },
       vpc
+    });
+
+    // HTTP:80 Listener
+    const httpListener = lb.addListener('HTTPListener', { port: 80, open: true });
+
+    httpListener.addAction('defaultHttpAction', {
+      action: alb.ListenerAction.redirect({ protocol: 'HTTPS', port: '443', host: '#{host}', path: '/#{path}', query: '#{query}', permanent: true }),
+    });
+
+    // GPIntegration should accept both plain HTTP and HTTPS
+    httpListener.addAction('httpGpIntAction', {
+      priority: 2,
+      conditions: [
+        alb.ListenerCondition.pathPatterns(['/*']),
+        alb.ListenerCondition.hostHeaders(['dev-gpintegration.whcc.com']),
+      ],
+      action: alb.ListenerAction.forward([gpTargetGroup]),
     });
 
     // Get wildcard certificate
