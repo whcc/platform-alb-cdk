@@ -1,8 +1,8 @@
 {
-  "name": "cdk-template-ts",
+  "name": "platform-alb-cdk",
   "version": "0.1.0",
   "bin": {
-    "cdk-template-ts": "bin/cdk-template-ts.js"
+    "platform-alb-cdk": "bin/platform-alb-cdk.js"
   },
   "scripts": {
     "build": "tsc",
