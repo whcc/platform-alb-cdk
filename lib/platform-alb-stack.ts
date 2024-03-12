@@ -22,12 +22,30 @@ export class PlatformDevCdkStack extends Stack {
     const devInternalSecurityGroup = new ec2.SecurityGroup(this, 'devInternalSecurityGroup', { vpc, allowAllOutbound: true });
     lb.addSecurityGroup(devInternalSecurityGroup);
 
-    // OAuth
+    // Login
     const whccloginTargetGroup = new alb.ApplicationTargetGroup(this, 'DevWhccloginTargetGroup', {
       port: 80,
       protocol: alb.ApplicationProtocol.HTTP,
       targetType: alb.TargetType.IP,
-      targetGroupName: 'dev2-login-whcc-com',
+      // targetGroupName: 'dev2-login-whcc-com',
+      targets: [
+        new targets.IpTarget('10.32.26.180')
+      ],
+      healthCheck: {
+        path: '/health',
+        healthyHttpCodes: '200-204',
+        port: '3063',
+        interval: Duration.seconds(10)
+      },
+      vpc,
+    });
+
+    // Prodpi login
+    const prodpiLoginTargetGroup = new alb.ApplicationTargetGroup(this, 'DevProdpiLoginTargetGroup', {
+      port: 80,
+      protocol: alb.ApplicationProtocol.HTTP,
+      targetType: alb.TargetType.IP,
+      // targetGroupName: 'dev2-login-whcc-com',
       targets: [
         new targets.IpTarget('10.32.26.180')
       ],
@@ -44,7 +62,7 @@ export class PlatformDevCdkStack extends Stack {
     const oasTargetGroup = new alb.ApplicationTargetGroup(this, 'oasApiTargetGroup', {
       port: 80,
       protocol: alb.ApplicationProtocol.HTTP,
-      targetGroupName: 'dev2-oas-api',
+      // targetGroupName: 'dev2-oas-api',
       targetType: alb.TargetType.IP,
       targets: [
         new targets.IpTarget('10.32.26.180')
@@ -63,7 +81,7 @@ export class PlatformDevCdkStack extends Stack {
       port: 80,
       protocol: alb.ApplicationProtocol.HTTP,
       targetType: alb.TargetType.IP,
-      targetGroupName: 'dev2-gpintegration',
+      // targetGroupName: 'dev2-gpintegration',
       targets: [
         new targets.IpTarget('10.32.26.180')
       ],
@@ -139,8 +157,8 @@ export class PlatformDevCdkStack extends Stack {
       action: alb.ListenerAction.forward([oasTargetGroup]),
     });
 
-    // Add OAuth rule
-    httpsListener.addAction('httpsOAuthAction', {
+    // Add Login rule
+    httpsListener.addAction('httpsLoginAction', {
       priority: 5,
       conditions: [
         alb.ListenerCondition.pathPatterns(['/']),
@@ -149,13 +167,32 @@ export class PlatformDevCdkStack extends Stack {
       action: alb.ListenerAction.forward([whccloginTargetGroup]),
     });
 
-    httpsListener.addAction('httpsOAuthActionAllPaths', {
+    httpsListener.addAction('httpsLoginActionAllPaths', {
       priority: 6,
       conditions: [
         alb.ListenerCondition.pathPatterns(['/*']),
         alb.ListenerCondition.hostHeaders(['dev-login.whcc.com']),
       ],
       action: alb.ListenerAction.forward([whccloginTargetGroup]),
+    });
+
+    // Add Prodpi login rule
+    httpsListener.addAction('httpsProdpiLoginAction', {
+      priority: 7,
+      conditions: [
+        alb.ListenerCondition.pathPatterns(['/']),
+        alb.ListenerCondition.hostHeaders(['dev.login.prodpi.com']),
+      ],
+      action: alb.ListenerAction.forward([prodpiLoginTargetGroup]),
+    });
+
+    httpsListener.addAction('httpsProdpiLoginActionAllPaths', {
+      priority: 8,
+      conditions: [
+        alb.ListenerCondition.pathPatterns(['/*']),
+        alb.ListenerCondition.hostHeaders(['dev.login.prodpi.com']),
+      ],
+      action: alb.ListenerAction.forward([prodpiLoginTargetGroup]),
     });
 
     // Default rule: return 503
