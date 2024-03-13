@@ -5,6 +5,10 @@ import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import { Construct } from 'constructs';
 import { AwsConfig } from './types';
 import * as targets from 'aws-cdk-lib/aws-elasticloadbalancingv2-targets';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as action from 'aws-cdk-lib/aws-cloudwatch-actions';
+import * as subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+
 export class PlatformDevCdkStack extends Stack {
   constructor(scope: Construct, id: string, awsConfig: AwsConfig) {
     super(scope, id, awsConfig);
@@ -114,7 +118,7 @@ export class PlatformDevCdkStack extends Stack {
     // Get wildcard certificate
     const certificateArn = 'arn:aws:acm:us-east-2:799497006720:certificate/ce6306c4-27ee-4d93-b12a-fafab73552af'; // TODO
     const sslCertificate = acm.Certificate.fromCertificateArn(this, 'SSLCertificate', certificateArn);
-  
+
     // HTTPS:443 Listener
     const httpsListener = lb.addListener('HTTPSListener', { port: 443, open: true, certificates: [sslCertificate] });
 
@@ -137,7 +141,7 @@ export class PlatformDevCdkStack extends Stack {
       ],
       action: alb.ListenerAction.forward([gpTargetGroup]),
     });
-        
+
     // Add OAS rule
     httpsListener.addAction('httpsOasAction', {
       priority: 3,
@@ -202,5 +206,50 @@ export class PlatformDevCdkStack extends Stack {
         messageBody: 'Service Unavailable',
       }),
     });
+
+    const alertBackendServiceArn = "arn:aws:sns:us-east-2:799497006720:alerts-backend-services";
+    const alertBackendServiceTopic = Topic.fromTopicArn(this, "AlertBackendServicesTopic", alertBackendServiceArn);
+
+    const whccLoginAlbAlarm = new cloudwatch.Alarm(this, 'whccLoginAlbAlarm', {
+      comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_OR_EQUAL_TO_THRESHOLD,
+      threshold: 1,
+      evaluationPeriods: 1,
+      metric: whccloginTargetGroup.metrics.healthyHostCount(),
+      datapointsToAlarm: 1,
+      actionsEnabled: true
+    });
+    whccLoginAlbAlarm.addAlarmAction(new action.SnsAction(alertBackendServiceTopic))
+
+    const prodpiLoginAlbAlarm = new cloudwatch.Alarm(this, 'prodpiLoginAlbAlarm', {
+      comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_OR_EQUAL_TO_THRESHOLD,
+      threshold: 1,
+      evaluationPeriods: 1,
+      metric: prodpiLoginTargetGroup.metrics.healthyHostCount(),
+      datapointsToAlarm: 1,
+      actionsEnabled: true
+    });
+    prodpiLoginAlbAlarm.addAlarmAction(new action.SnsAction(alertBackendServiceTopic))
+
+    const gpTargetAlbAlarm = new cloudwatch.Alarm(this, 'gpTargetAlbAlarm', {
+      comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_OR_EQUAL_TO_THRESHOLD,
+      threshold: 1,
+      evaluationPeriods: 1,
+      metric: gpTargetGroup.metrics.healthyHostCount(),
+      datapointsToAlarm: 1,
+      actionsEnabled: true
+    });
+    gpTargetAlbAlarm.addAlarmAction(new action.SnsAction(alertBackendServiceTopic))
+
+    const oasAlbAlarm = new cloudwatch.Alarm(this, 'oasAlbAlarm', {
+      comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_OR_EQUAL_TO_THRESHOLD,
+      threshold: 1,
+      evaluationPeriods: 1,
+      metric: oasTargetGroup.metrics.healthyHostCount(),
+      datapointsToAlarm: 1,
+      actionsEnabled: true
+    });
+    oasAlbAlarm.addAlarmAction(new action.SnsAction(alertBackendServiceTopic))
+
+    alertBackendServiceTopic.addSubscription(new subscriptions.UrlSubscription())
   }
 }
