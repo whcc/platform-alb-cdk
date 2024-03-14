@@ -1,4 +1,4 @@
-import { Duration, Stack } from 'aws-cdk-lib';
+import { Duration, RemovalPolicy, Stack } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as alb from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
@@ -7,7 +7,7 @@ import { AwsConfig } from './types';
 import * as targets from 'aws-cdk-lib/aws-elasticloadbalancingv2-targets';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as action from 'aws-cdk-lib/aws-cloudwatch-actions';
-import * as subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+import { Topic } from 'aws-cdk-lib/aws-sns';
 
 export class PlatformDevCdkStack extends Stack {
   constructor(scope: Construct, id: string, awsConfig: AwsConfig) {
@@ -17,14 +17,25 @@ export class PlatformDevCdkStack extends Stack {
     let vpc: ec2.IVpc;
     vpc = ec2.Vpc.fromLookup(this, 'vpc', { vpcId: awsConfig.vpcArn });
 
+    // Create custom security group
+    const devInternalSecurityGroup = new ec2.SecurityGroup(this, 'devInternalSecurityGroup', { vpc, allowAllOutbound: true }); 
+    devInternalSecurityGroup.addIngressRule(ec2.Peer.ipv4('10.0.0.0/8'), ec2.Port.tcp(80));
+    devInternalSecurityGroup.addIngressRule(ec2.Peer.ipv4('10.0.0.0/8'), ec2.Port.tcp(443));
+
+    // This is necessary to remove the default inbound rules.
+    const devInternalSecurityGroupImmutable = ec2.SecurityGroup.fromSecurityGroupId(
+      this,
+      "devInternalSecurityGroupImmutable",
+      devInternalSecurityGroup.securityGroupId,
+      { mutable: false } // This flag disables creation of unnecessary default 0.0.0.0 inbound rules.
+    );
+
     // Create the load balancer in a VPC. Value for 'internetFacing' is 'false', this will create an internal load balancer.
     const lb = new alb.ApplicationLoadBalancer(this, 'LB', {
       vpc,
-      internetFacing: false
+      internetFacing: false,
+      securityGroup: devInternalSecurityGroupImmutable,
     });
-
-    const devInternalSecurityGroup = new ec2.SecurityGroup(this, 'devInternalSecurityGroup', { vpc, allowAllOutbound: true });
-    lb.addSecurityGroup(devInternalSecurityGroup);
 
     // Login
     const whccloginTargetGroup = new alb.ApplicationTargetGroup(this, 'DevWhccloginTargetGroup', {
@@ -41,7 +52,7 @@ export class PlatformDevCdkStack extends Stack {
         port: '3063',
         interval: Duration.seconds(10)
       },
-      vpc,
+      vpc
     });
 
     // Prodpi login
@@ -250,6 +261,5 @@ export class PlatformDevCdkStack extends Stack {
     });
     oasAlbAlarm.addAlarmAction(new action.SnsAction(alertBackendServiceTopic))
 
-    alertBackendServiceTopic.addSubscription(new subscriptions.UrlSubscription())
   }
 }
