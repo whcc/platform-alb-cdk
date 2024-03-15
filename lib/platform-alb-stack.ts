@@ -8,10 +8,14 @@ import * as targets from 'aws-cdk-lib/aws-elasticloadbalancingv2-targets';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as action from 'aws-cdk-lib/aws-cloudwatch-actions';
 import { Topic } from 'aws-cdk-lib/aws-sns';
+import { NameBuilder } from './utilities/naming';
 
 export class PlatformDevCdkStack extends Stack {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id, props);
+
+    // Initialize namebuilder.
+    const nameBuilder = new NameBuilder(props.config)
 
     // Get our existing VPC
     let vpc: ec2.IVpc;
@@ -21,7 +25,7 @@ export class PlatformDevCdkStack extends Stack {
     const devInternalSecurityGroup = new ec2.SecurityGroup(this, 'devInternalSecurityGroup', {
       vpc, 
       allowAllOutbound: true,
-      securityGroupName: props.namingBuilder.GetAwsNaming('alb-security-group')
+      securityGroupName: nameBuilder.GetAwsNaming('alb-security-group')
     });
     devInternalSecurityGroup.addIngressRule(ec2.Peer.ipv4('10.0.0.0/8'), ec2.Port.tcp(80));
     devInternalSecurityGroup.addIngressRule(ec2.Peer.ipv4('10.0.0.0/8'), ec2.Port.tcp(443));
@@ -39,7 +43,7 @@ export class PlatformDevCdkStack extends Stack {
       vpc,
       internetFacing: false,
       securityGroup: devInternalSecurityGroupImmutable,
-      loadBalancerName: props.namingBuilder.GetAwsNaming('platform-internal-alb') // Load balancer name cannot start with internal-
+      loadBalancerName: nameBuilder.GetAwsNaming('platform-internal-alb') // Load balancer name cannot start with internal-
     });
 
     // Login
@@ -47,7 +51,7 @@ export class PlatformDevCdkStack extends Stack {
       port: 80,
       protocol: alb.ApplicationProtocol.HTTP,
       targetType: alb.TargetType.IP,
-      targetGroupName: props.namingBuilder.GetAwsNaming('login-target-group'),
+      targetGroupName: nameBuilder.GetAwsNaming('login-target-group'),
       targets: [
         new targets.IpTarget('10.32.26.180')
       ],
@@ -65,7 +69,7 @@ export class PlatformDevCdkStack extends Stack {
       port: 80,
       protocol: alb.ApplicationProtocol.HTTP,
       targetType: alb.TargetType.IP,
-      targetGroupName: props.namingBuilder.GetAwsNaming('prodpilogin-target-group'),
+      targetGroupName: nameBuilder.GetAwsNaming('prodpilogin-target-group'),
       targets: [
         new targets.IpTarget('10.32.26.180')
       ],
@@ -82,7 +86,7 @@ export class PlatformDevCdkStack extends Stack {
     const oasTargetGroup = new alb.ApplicationTargetGroup(this, 'oasApiTargetGroup', {
       port: 80,
       protocol: alb.ApplicationProtocol.HTTP,
-      targetGroupName: props.namingBuilder.GetAwsNaming('oas-target-group'),
+      targetGroupName: nameBuilder.GetAwsNaming('oas-target-group'),
       targetType: alb.TargetType.IP,
       targets: [
         new targets.IpTarget('10.32.26.180')
@@ -101,7 +105,7 @@ export class PlatformDevCdkStack extends Stack {
       port: 80,
       protocol: alb.ApplicationProtocol.HTTP,
       targetType: alb.TargetType.IP,
-      targetGroupName: props.namingBuilder.GetAwsNaming('gp-target-group'),
+      targetGroupName: nameBuilder.GetAwsNaming('gp-target-group'),
       targets: [
         new targets.IpTarget('10.32.26.180')
       ],
@@ -233,7 +237,7 @@ export class PlatformDevCdkStack extends Stack {
       metric: whccloginTargetGroup.metrics.healthyHostCount(),
       datapointsToAlarm: 1,
       actionsEnabled: true,
-      alarmName: props.namingBuilder.GetAwsNaming('login-alb-alarm')
+      alarmName: nameBuilder.GetAwsNaming('login-alb-alarm')
     });
     whccLoginAlbAlarm.addAlarmAction(new action.SnsAction(alertBackendServiceTopic))
 
@@ -244,7 +248,7 @@ export class PlatformDevCdkStack extends Stack {
       metric: prodpiLoginTargetGroup.metrics.healthyHostCount(),
       datapointsToAlarm: 1,
       actionsEnabled: true,
-      alarmName: props.namingBuilder.GetAwsNaming('prodpilogin-alb-alarm')
+      alarmName: nameBuilder.GetAwsNaming('prodpilogin-alb-alarm')
     });
     prodpiLoginAlbAlarm.addAlarmAction(new action.SnsAction(alertBackendServiceTopic))
 
@@ -255,7 +259,7 @@ export class PlatformDevCdkStack extends Stack {
       metric: gpTargetGroup.metrics.healthyHostCount(),
       datapointsToAlarm: 1,
       actionsEnabled: true,
-      alarmName: props.namingBuilder.GetAwsNaming('gp-alb-alarm')
+      alarmName: nameBuilder.GetAwsNaming('gp-alb-alarm')
     });
     gpIntegrationAlbAlarm.addAlarmAction(new action.SnsAction(alertBackendServiceTopic))
 
@@ -266,7 +270,7 @@ export class PlatformDevCdkStack extends Stack {
       metric: oasTargetGroup.metrics.healthyHostCount(),
       datapointsToAlarm: 1,
       actionsEnabled: true,
-      alarmName: props.namingBuilder.GetAwsNaming('oas-alb-alarm')
+      alarmName: nameBuilder.GetAwsNaming('oas-alb-alarm')
     });
     oasAlbAlarm.addAlarmAction(new action.SnsAction(alertBackendServiceTopic))
   }

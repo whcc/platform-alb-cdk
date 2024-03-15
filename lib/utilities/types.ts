@@ -1,13 +1,14 @@
 import { StackProps } from 'aws-cdk-lib';
-import { NameBuilder } from './naming';
 
 export interface Props extends StackProps {
   vpcArn: string;
-  namingBuilder: NameBuilder;
+  config: Config;
 }
 
-export interface Naming {
+export interface Config {
   environment: string;
-  region: string;
+  regionCode: string;
+  region?: string;
+  account?: string;
 }
 

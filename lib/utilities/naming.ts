@@ -1,16 +1,17 @@
 import * as assert from "assert";
-import {Naming} from './types'
+import { Config } from './types'
   
 
-export class NameBuilder implements Naming {
+export class NameBuilder implements Config {
     environment: string;
-    region: string;
-    constructor( namingConfig : Naming ){
-        Object.assign(this,namingConfig,{})
+    regionCode: string;
+
+    constructor(namingConfig : Config){
+        Object.assign(this, namingConfig, {})
     }
 
     GetAwsNaming(AwsIndentifer : string):string {
         assert(AwsIndentifer,"Missing AwsIdentifer Parameter for method getAwsNaming");
-        return `${AwsIndentifer}-${this.environment}-${this.region}`;
+        return `${AwsIndentifer}-${this.environment}-${this.regionCode}`;
     }
 }

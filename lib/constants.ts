@@ -1,6 +1,8 @@
-import { Naming } from "./utilities/types";
+import { Config } from "./utilities/types";
 
-export const DEV_NAMING : Naming = {
+export const DEV_CONFIG: Config = {
     environment: "dev",
-    region: "ue2"
+    regionCode: "ue2",
+    region: "us-east-2",
+    account: "799497006720",
 }
