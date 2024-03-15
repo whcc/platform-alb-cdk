@@ -18,7 +18,11 @@ export class PlatformDevCdkStack extends Stack {
     vpc = ec2.Vpc.fromLookup(this, 'vpc', { vpcId: props.vpcArn });
 
     // Create custom security group
-    const devInternalSecurityGroup = new ec2.SecurityGroup(this, 'devInternalSecurityGroup', { vpc, allowAllOutbound: true, securityGroupName: props.namingBuilder.GetAwsNaming('alb-security-group')}); 
+    const devInternalSecurityGroup = new ec2.SecurityGroup(this, 'devInternalSecurityGroup', {
+      vpc, 
+      allowAllOutbound: true,
+      securityGroupName: props.namingBuilder.GetAwsNaming('alb-security-group')
+    });
     devInternalSecurityGroup.addIngressRule(ec2.Peer.ipv4('10.0.0.0/8'), ec2.Port.tcp(80));
     devInternalSecurityGroup.addIngressRule(ec2.Peer.ipv4('10.0.0.0/8'), ec2.Port.tcp(443));
 
@@ -265,6 +269,5 @@ export class PlatformDevCdkStack extends Stack {
       alarmName: props.namingBuilder.GetAwsNaming('oas-alb-alarm')
     });
     oasAlbAlarm.addAlarmAction(new action.SnsAction(alertBackendServiceTopic))
-
   }
 }
