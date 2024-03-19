@@ -65,7 +65,7 @@ export class PlatformDevCdkStack extends Stack {
     });
 
     // OAS
-    const oasTargetGroup = new alb.ApplicationTargetGroup(this, 'oasApiTargetGroup', {
+    const oasTargetGroup = new alb.ApplicationTargetGroup(this, 'DevOasTargetGroup', {
       port: 80,
       protocol: alb.ApplicationProtocol.HTTP,
       targetGroupName: nameBuilder.GetAwsNaming('oas-target-group'),
