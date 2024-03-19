@@ -46,30 +46,12 @@ export class PlatformDevCdkStack extends Stack {
       loadBalancerName: nameBuilder.GetAwsNaming('platform-internal-alb') // Load balancer name cannot start with internal-
     });
 
-    // Login
-    const whccloginTargetGroup = new alb.ApplicationTargetGroup(this, 'DevWhccloginTargetGroup', {
+    // Login target group
+    const loginTargetGroup = new alb.ApplicationTargetGroup(this, 'DevLoginTargetGroup', {
       port: 80,
       protocol: alb.ApplicationProtocol.HTTP,
       targetType: alb.TargetType.IP,
       targetGroupName: nameBuilder.GetAwsNaming('login-target-group'),
-      targets: [
-        new targets.IpTarget('10.32.26.180')
-      ],
-      healthCheck: {
-        path: '/health',
-        healthyHttpCodes: '200-204',
-        port: '3063',
-        interval: Duration.seconds(10)
-      },
-      vpc
-    });
-
-    // Prodpi login
-    const prodpiLoginTargetGroup = new alb.ApplicationTargetGroup(this, 'DevProdpiLoginTargetGroup', {
-      port: 80,
-      protocol: alb.ApplicationProtocol.HTTP,
-      targetType: alb.TargetType.IP,
-      targetGroupName: nameBuilder.GetAwsNaming('prodpilogin-target-group'),
       targets: [
         new targets.IpTarget('10.32.26.180')
       ],
@@ -129,8 +111,7 @@ export class PlatformDevCdkStack extends Stack {
     httpListener.addAction('httpGpIntAction', {
       priority: 2,
       conditions: [
-        alb.ListenerCondition.pathPatterns(['/*']),
-        alb.ListenerCondition.hostHeaders(['dev-gpintegration.whcc.com']),
+        alb.ListenerCondition.hostHeaders(['dev-gpintegration.whcc.com'])
       ],
       action: alb.ListenerAction.forward([gpTargetGroup]),
     });
@@ -146,36 +127,15 @@ export class PlatformDevCdkStack extends Stack {
     httpsListener.addAction('httpsGpIntAction', {
       priority: 1,
       conditions: [
-        alb.ListenerCondition.pathPatterns(['/']),
-        alb.ListenerCondition.hostHeaders(['dev-gpintegration.whcc.com']),
-      ],
-      action: alb.ListenerAction.forward([gpTargetGroup]),
-    });
-
-    // Add GPInt rule
-    httpsListener.addAction('httpsGpIntActionAllPaths', {
-      priority: 2,
-      conditions: [
-        alb.ListenerCondition.pathPatterns(['/*']),
-        alb.ListenerCondition.hostHeaders(['dev-gpintegration.whcc.com']),
+        alb.ListenerCondition.hostHeaders(['dev-gpintegration.whcc.com'])
       ],
       action: alb.ListenerAction.forward([gpTargetGroup]),
     });
 
     // Add OAS rule
     httpsListener.addAction('httpsOasAction', {
-      priority: 3,
+      priority: 2,
       conditions: [
-        alb.ListenerCondition.pathPatterns(['/']),
-        alb.ListenerCondition.hostHeaders(['dev-apps.whcc.com']),
-      ],
-      action: alb.ListenerAction.forward([oasTargetGroup]),
-    });
-
-    httpsListener.addAction('httpsOasActionAllAllPaths', {
-      priority: 4,
-      conditions: [
-        alb.ListenerCondition.pathPatterns(['/*']),
         alb.ListenerCondition.hostHeaders(['dev-apps.whcc.com']),
       ],
       action: alb.ListenerAction.forward([oasTargetGroup]),
@@ -183,40 +143,11 @@ export class PlatformDevCdkStack extends Stack {
 
     // Add Login rule
     httpsListener.addAction('httpsLoginAction', {
-      priority: 5,
+      priority: 3,
       conditions: [
-        alb.ListenerCondition.pathPatterns(['/']),
-        alb.ListenerCondition.hostHeaders(['dev-login.whcc.com']),
+        alb.ListenerCondition.hostHeaders(['dev-login.whcc.com'])
       ],
-      action: alb.ListenerAction.forward([whccloginTargetGroup]),
-    });
-
-    httpsListener.addAction('httpsLoginActionAllPaths', {
-      priority: 6,
-      conditions: [
-        alb.ListenerCondition.pathPatterns(['/*']),
-        alb.ListenerCondition.hostHeaders(['dev-login.whcc.com']),
-      ],
-      action: alb.ListenerAction.forward([whccloginTargetGroup]),
-    });
-
-    // Add Prodpi login rule
-    httpsListener.addAction('httpsProdpiLoginAction', {
-      priority: 7,
-      conditions: [
-        alb.ListenerCondition.pathPatterns(['/']),
-        alb.ListenerCondition.hostHeaders(['dev.login.prodpi.com']),
-      ],
-      action: alb.ListenerAction.forward([prodpiLoginTargetGroup]),
-    });
-
-    httpsListener.addAction('httpsProdpiLoginActionAllPaths', {
-      priority: 8,
-      conditions: [
-        alb.ListenerCondition.pathPatterns(['/*']),
-        alb.ListenerCondition.hostHeaders(['dev.login.prodpi.com']),
-      ],
-      action: alb.ListenerAction.forward([prodpiLoginTargetGroup]),
+      action: alb.ListenerAction.forward([loginTargetGroup]),
     });
 
     // Default rule: return 503
@@ -228,50 +159,21 @@ export class PlatformDevCdkStack extends Stack {
     });
 
     const alertBackendServiceArn = "arn:aws:sns:us-east-2:799497006720:alerts-backend-services";
-    const alertBackendServiceTopic = Topic.fromTopicArn(this, "AlertBackendServicesTopic", alertBackendServiceArn);
+    const alertBackendServiceTopic = Topic.fromTopicArn(this, "alertBackendServicesTopic", alertBackendServiceArn);
 
-    const whccLoginAlbAlarm = new cloudwatch.Alarm(this, 'whccLoginAlbAlarm', {
-      comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_OR_EQUAL_TO_THRESHOLD,
-      threshold: 1,
-      evaluationPeriods: 1,
-      metric: whccloginTargetGroup.metrics.healthyHostCount(),
-      datapointsToAlarm: 1,
-      actionsEnabled: true,
-      alarmName: nameBuilder.GetAwsNaming('login-alb-alarm')
-    });
-    whccLoginAlbAlarm.addAlarmAction(new action.SnsAction(alertBackendServiceTopic))
+    const alarmNames: string[] = ['login', 'gp', 'oas' ];
 
-    const prodpiLoginAlbAlarm = new cloudwatch.Alarm(this, 'prodpiLoginAlbAlarm', {
-      comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_OR_EQUAL_TO_THRESHOLD,
-      threshold: 1,
-      evaluationPeriods: 1,
-      metric: prodpiLoginTargetGroup.metrics.healthyHostCount(),
-      datapointsToAlarm: 1,
-      actionsEnabled: true,
-      alarmName: nameBuilder.GetAwsNaming('prodpilogin-alb-alarm')
+    alarmNames.forEach(name => {
+        const albAlarm = new cloudwatch.Alarm(this, `${name}AlbAlarm`, {
+          comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_OR_EQUAL_TO_THRESHOLD,
+          threshold: 1,
+          evaluationPeriods: 1,
+          metric: loginTargetGroup.metrics.healthyHostCount(),
+          datapointsToAlarm: 1,
+          actionsEnabled: true,
+          alarmName: nameBuilder.GetAwsNaming(`${name}-alb-alarm`)
+        });
+        albAlarm.addAlarmAction(new action.SnsAction(alertBackendServiceTopic))
     });
-    prodpiLoginAlbAlarm.addAlarmAction(new action.SnsAction(alertBackendServiceTopic))
-
-    const gpIntegrationAlbAlarm = new cloudwatch.Alarm(this, 'gpTargetAlbAlarm', {
-      comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_OR_EQUAL_TO_THRESHOLD,
-      threshold: 1,
-      evaluationPeriods: 1,
-      metric: gpTargetGroup.metrics.healthyHostCount(),
-      datapointsToAlarm: 1,
-      actionsEnabled: true,
-      alarmName: nameBuilder.GetAwsNaming('gp-alb-alarm')
-    });
-    gpIntegrationAlbAlarm.addAlarmAction(new action.SnsAction(alertBackendServiceTopic))
-
-    const oasAlbAlarm = new cloudwatch.Alarm(this, 'oasAlbAlarm', {
-      comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_OR_EQUAL_TO_THRESHOLD,
-      threshold: 1,
-      evaluationPeriods: 1,
-      metric: oasTargetGroup.metrics.healthyHostCount(),
-      datapointsToAlarm: 1,
-      actionsEnabled: true,
-      alarmName: nameBuilder.GetAwsNaming('oas-alb-alarm')
-    });
-    oasAlbAlarm.addAlarmAction(new action.SnsAction(alertBackendServiceTopic))
   }
 }
